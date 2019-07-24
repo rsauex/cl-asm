@@ -1,0 +1,233 @@
+;;; Assembler:
+
+- resolve lables & compute offsets for every instruction
+- produce machine code
+
+;;; In lisp
+
+label
+  (instruction args...)
+
+;;; Definitions
+
+(define-instruction <name>
+  (((<name> <type>) ...)
+   <bit-or-name>)
+  ...)
+
+;;
+
+(defgeneric instruction-size (instruction &rest arguments))
+(defgeneric instruction-encode (instruction &rest arguments))
+
+;;;;;;;;;;;;;
+R  - register        0  - 31
+R2 - register        16 - 31
+R3 - register        16 - 23
+Rp - register pair   {24, 26, 28, 30}
+Rpa- register pair   {0, 2, ..., 30}
+I  - immediate
+O  - PC offset
+A  - PC value
+IO - IO register
+
+
+;;; Arithmetic
+
+ADD   d : R   r : R   0000 11rd dddd rrrr   ;; - Add
+ADC   d : R   r : R   0001 11rd dddd rrrr   ;; - Add with carry
+ADIW  d : Rp  k : I   1001 0110 kkdd kkkk   ;; - Add immediate to word
+
+SUB   d : R   r : R   0001 10rd dddd rrrr   ;; - Substract
+SBC   d : R   r : R   0000 10rd dddd rrrr   ;; - Substract with carry
+SUBI  d : R   k : I   0101 kkkk dddd kkkk   ;; - Substract immediate
+SBCI  d : R2  k : I   0100 kkkk dddd kkkk   ;; - Substract immediate with carry
+SBIW  d : Rp  k : I   1001 0111 kkdd kkkk   ;; - Substract immediate from word
+
+MUL   d : R   r : R   1001 11rd dddd rrrr   ;; - Multiply unsigned
+MULS  d : R2  r : R2  0000 0010 dddd rrrr   ;; - Multiply signed
+MULSU d : R3  r : R3  0000 0011 0ddd 0rrr   ;; - Multiply signed with unsigned
+
+FMUL  d : R3  r : R3  0000 0011 0ddd 1rrr   ;; - Fractional multiply unsigned
+FMULS d : R3  r : R3  0000 0011 1ddd 0rrr   ;; - Fractional multiply signed
+FMULSU d: R3  r : R3  0000 0011 1ddd 1rrr   ;; - Fractional multiply signed with unsigned
+
+DEC   d : R           1001 010d dddd 1010   ;; - Decrement
+INC   d : R           1001 010d dddd 0011   ;; - Increment
+
+;;; Logic
+
+AND   d : R   r : R   0010 00rd dddd rrrr   ;; - Logical AND
+ANDI  d : R2  k : I   0111 kkkk dddd kkkk   ;; - Logical AND with immediate
+OR    d : R   r : R   0010 10rd dddd rrrr   ;; - Logical OR
+ORI   d : R2  k : I   0110 kkkk dddd kkkk   ;; - Logical OR with immediate
+EOR   d : R   r : R   0010 01rd dddd rrrr   ;; - Logical XOR
+
+COM   d : R           1001 010d dddd 0000   ;; - One's complement
+NEG   d : R           1001 010d dddd 0001   ;; - Two's complement
+
+LSL   d : R           0000 11dd dddd dddd   ;; - Logical shift left (ADD Rd,Rd)
+LSR   d : R           1001 010d dddd 0110   ;; - Logical shift right
+ASR   d : R           1001 010d dddd 0101   ;; - Arithmetic shift rigth
+
+ROL   d : R           0001 11dd dddd dddd   ;; - Rotate left though Carry (ADC Rd,Rd)
+ROR   d : R           1001 010d dddd 0111   ;; - Rotate right though Carry
+
+BSET  s : I           1001 0100 0sss 1000   ;; - Set bit in SREG
+BCLR  s : I           1001 0100 1sss 1000   ;; - Clean bit in SREG
+
+CLR   d : R           0010 01dd dddd dddd   ;; - Clear register (EOR Rd,Rd)
+SER   d : R2          1110 1111 dddd 1111   ;; - Set all bits in register
+
+SBR   d : R2  k : I   0110 kkkk dddd kkkk   ;; - Set bits in register
+CBR   d : R2  k : I                         ;; - Clear bits in register (ANDI with K complemented)
+
+SWAP  d : R           1001 010d dddd 0010   ;; - Swap nibbles
+
+;;; Branches
+
+SBIC  a : IO  b : I   1001 1001 aaaa abbb   ;; - Skip if bit in I/O register is unset
+SBIS  a : IO  b : I   1001 1011 aaaa abbb   ;; - Skip if bit in I/O register is set
+
+SBRC  r : R   b : I   1111 110r rrrr 0bbb   ;; - Skip if bit in register is unset
+SBRS  r : R   b : I   1111 111r rrrr 0bbb   ;; - Skip if bit in register is set
+
+BRBC  s : I   k : O   1111 01kk kkkk ksss   ;; - Brunch if bit in SREG is unset
+BRBS  s : I   k : O   1111 00kk kkkk ksss   ;; - Brunch if bit in SREG is set
+BRCC  k : O           1111 01kk kkkk k000   ;; - Brunch if Carry bit is unset
+BRCS  k : O           1111 00kk kkkk k000   ;; - Brunch if Carry bit is set
+BRSH  k : O           1111 01kk kkkk k000   ;; - Brunch if >= (unsigned)
+BRLO  k : O           1111 00kk kkkk k000   ;; - Brunch if <  (unsigned)
+BRNE  k : O           1111 01kk kkkk k001   ;; - Brunch if /=
+BREQ  k : O           1111 00kk kkkk k001   ;; - Brunch if ==
+BRPL  k : O           1111 01kk kkkk k010   ;; - Brunch if Plus
+BRMI  k : O           1111 00kk kkkk k010   ;; - Brunch if Minus
+BRVC  k : O           1111 01kk kkkk k011   ;; - Brunch if Overflow bit is unset
+BRVS  k : O           1111 00kk kkkk k011   ;; - Brunch if Overflow bit is set
+BRGE  k : O           1111 01kk kkkk k100   ;; - Brunch if >= (signed)
+BRLT  k : O           1111 00kk kkkk k100   ;; - Brunch if <  (signed)
+BRHC  k : O           1111 01kk kkkk k101   ;; - Brunch if Half Carry bit is unset
+BRHS  k : O           1111 00kk kkkk k101   ;; - Brunch if Half Carry bit is set
+BRTC  k : O           1111 01kk kkkk k110   ;; - Brunch if T bit is unset
+BRTS  k : O           1111 00kk kkkk k110   ;; - Brunch if T bit is set
+BRID  k : O           1111 01kk kkkk k111   ;; - Brunch if Global Interrupt is disabled
+BRIE  k : O           1111 00kk kkkk k111   ;; - Brunch if Global Interrupt is enabled
+
+;;; Bits
+
+CBI   a : IO  b : I   1001 1000 aaaa abbb   ;; - Unset bit in I/O register
+SBI   a : IO  b : I   1001 1010 aaaa abbb   ;; - Set bit in I/O register
+
+BLD   d : R   b : I   1111 100d dddd 0bbb   ;; - Set T bit to register bit
+BST   d : R   b : I   1111 101d dddd 0bbb   ;; - Set T bit from register bit
+
+CLC                   1001 0100 1000 1000   ;; - Clear Carry bit
+CLZ                   1001 0100 1001 1000   ;; - Clear Zero bit
+CLN                   1001 0100 1010 1000   ;; - Clear Negative bit
+CLV                   1001 0100 1011 1000   ;; - Clear Overflow bit
+CLS                   1001 0100 1100 1000   ;; - Clear Signed bit
+CLH                   1001 0100 1101 1000   ;; - Clear Half Carry bit
+CLT                   1001 0100 1110 1000   ;; - Clear T bit
+CLI                   1001 0100 1111 1000   ;; - Clear Global Interrupt bit
+
+SEC                   1001 0100 0000 1000   ;; - Set Carry bit
+SEZ                   1001 0100 0001 1000   ;; - Set Zero bit
+SEN                   1001 0100 0010 1000   ;; - Set Negative bit
+SEV                   1001 0100 0011 1000   ;; - Set Overflow bit
+SES                   1001 0100 0100 1000   ;; - Set Signed bit
+SEH                   1001 0100 0101 1000   ;; - Set Half carry bit
+SET                   1001 0100 0110 1000   ;; - Set T bit
+SEI                   1001 0100 0111 1000   ;; - Set Global interrupt bit
+
+;;; Compare
+
+CP    d : R   r : R   0001 01rd dddd rrrr   ;; - Compare
+CPC   d : R   r : R   0000 01rd dddd rrrr   ;; - Compare with carry
+CPI   d : R   k : I   0011 kkkk dddd kkkk   ;; - Compare with immediate
+CPSE  d : R   r : R   0001 00rd dddd rrrr   ;; - Compare & Skip if equal
+
+TST   d : R           0010 00dd dddd dddd   ;; - Test for Zero or Minus (AND Rd, Rd)
+
+;;; Call & jump
+
+CALL  k : A           1001 010k kkkk 111k kkkk kkkk kkkk kkkk  ;; - Call to a procedure
+RCALL k : O           1101 kkkk kkkk kkkk   ;; - Relative call to a procedure
+ICALL                 1001 0101 0000 1001   ;; - Indirect call to a procedure
+EICALL                1001 0101 0001 1001   ;; - Extended indirect call to a procedure
+
+RET                   1001 0101 0000 1000   ;; - Return from a procedure
+RETI                  1001 0101 0001 1000   ;; - Return from a interrupt
+
+JMP   k : A           1001 010k kkkk 110k kkkk kkkk kkkk kkkk  ;; - Jump
+RJMP  k : O           1100 kkkk kkkk kkkk   ;; - Relative jump
+IJMP                  1001 0100 0000 1001   ;; - Indirect jump
+EIJMP                 1001 0100 0001 1001   ;; - Extended indirect jump
+
+;;; I/O
+
+IN    d : R   a : IO 1011 0aad dddd aaaa   ;; - Read from a I/O register
+OUT   a : IO r : R   1011 1aar rrrr aaaa   ;; - Write to a I/O register
+
+;;; Memory
+
+LAC   'Z'     r : R   1001 001r rrrr 0110   ;; - Load and clear
+LAS   'Z'     r : R   1001 001r rrrr 0101   ;; - Load and set
+LAT   'Z'     r : R   1001 001r rrrr 0111   ;; - Load and toggle
+
+LD    d : R   'X'     1001 000d dddd 1100   ;; - Load indirect
+LD    d : R   'X+'    1001 000d dddd 1101   ;; - Load indirect
+LD    d : R   '-X'    1001 000d dddd 1110   ;; - Load indirect
+LD    d : R   'Y'     1000 000d dddd 1000   ;; - Load indirect
+LD    d : R   'Y+'    1001 000d dddd 1001   ;; - Load indirect
+LD    d : R   '-Y'    1001 000d dddd 1010   ;; - Load indirect
+LDD   d : R   'Y+'q:I 10q0 qq0d dddd 1qqq   ;; - Load indirect
+LD    d : R   'Z'     1000 000d dddd 0000   ;; - Load indirect
+LD    d : R   'Z+'    1001 000d dddd 0001   ;; - Load indirect
+LD    d : R   '-Z'    1001 000d dddd 0010   ;; - Load indirect
+LDD   d : R   'Z+'q:I 10q0 qq0d dddd 0qqq   ;; - Load indirect
+
+LDI   d : R2  k : I   1110 kkkk dddd kkkk   ;; - Load immediate
+
+LDS   d : R   k : I   1001 000d dddd 0000 kkkk kkkk kkkk kkkk  ;; - Load direct from Data space
+LDS   d : R2  k : I   1010 0kkk dddd kkkk   ;; - Load direct from Data space
+
+LPM                   1001 0101 1100 1000   ;; - Load indirect from Program memory
+LPM   d : R   'Z'     1001 000d dddd 0100   ;; - Load indirect from Program memory
+LPM   d : R   'Z+'    1001 000d dddd 0101   ;; - Load indirect from Program memory
+
+ELPM                  1001 0101 1101 1000   ;; - Extended load program memory
+ELPM  d : R   'Z'     1001 000d dddd 0110   ;; - Extended load program memory
+ELPM  d : R   'Z+'    1001 000d dddd 0111   ;; - Extended load program memory
+
+MOV   d : R   r : R   0010 11rd dddd rrrr   ;; - Copy register
+MOVW  d : Rpa r : Rpa 0000 0001 dddd rrrr   ;; - Copy register word
+
+POP   d : R           1001 000d dddd 1111   ;; - Pop register from stack
+PUSH  r : R           1001 001r rrrr 1111   ;; - Push register to stack
+
+SPM                   1001 0101 1110 1000   ;; - Store program memory
+SPM   'Z+'            1001 0101 1111 1000   ;; - Store program memory
+
+ST    'X'     r : R   1001 001r rrrr 1100   ;; - Store indirect
+ST    'X+'    r : R   1001 001r rrrr 1101   ;; - Store indirect
+ST    '-X'    r : R   1001 001r rrrr 1110   ;; - Store indirect
+ST    'Y'     r : R   1000 001r rrrr 1000   ;; - Store indirect
+ST    'Y+'    r : R   1001 001r rrrr 1001   ;; - Store indirect
+ST    '-Y'    r : R   1001 001r rrrr 1010   ;; - Store indirect
+STD   'Y+'q:I r : R   10q0 qq1r rrrr 1qqq   ;; - Store indirect
+ST    'Z'     r : R   1000 001r rrrr 0000   ;; - Store indirect
+ST    'Z+'    r : R   1001 001r rrrr 0001   ;; - Store indirect
+ST    '-Z'    r : R   1001 001r rrrr 0010   ;; - Store indirect
+STD   'Z+'q:I r : R   10q0 qq1r rrrr 0qqq   ;; - Store indirect
+
+STS   k : I   r : R   1001 001r rrrr 0000 kkkk kkkk kkkk kkkk  ;; - Store direct to Data space
+STS   k : I   r : R   1010 1kkk dddd kkkk   ;; - Store direct to Data space
+
+XCH   d : R           1001 001d dddd 0100   ;; - Exchange register and memory
+
+;;; Misc
+
+WDR                   1001 0101 1010 1000   ;; - Watchdog reset
+BREAK                 1001 0101 1001 1000   ;; - Hardware break
+SLEEP                 1001 0101 1000 1000   ;; - Sleep mode
+NOP                   0000 0000 0000 0000   ;; - No operation
