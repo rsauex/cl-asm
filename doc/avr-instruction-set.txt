@@ -1,25 +1,3 @@
-;;; Assembler:
-
-- resolve lables & compute offsets for every instruction
-- produce machine code
-
-;;; In lisp
-
-label
-  (instruction args...)
-
-;;; Definitions
-
-(define-instruction <name>
-  (((<name> <type>) ...)
-   <bit-or-name>)
-  ...)
-
-;;
-
-(defgeneric instruction-size (instruction &rest arguments))
-(defgeneric instruction-encode (instruction &rest arguments))
-
 ;;;;;;;;;;;;;
 R  - register        0  - 31
 R2 - register        16 - 31
