@@ -1,10 +1,14 @@
 (uiop:define-package #:cl-asm/src/asm-base
   (:use #:cl)
-  (:import-from #:flexi-streams)
+  (:import-from #:flexi-streams
+                #:octet
+                #:with-output-to-sequence)
   (:export #:instruction-size
            #:instruction-encode
            #:write-word
            #:assemble))
+
+(in-package #:cl-asm/src/asm-base)
 
 (defconstant +max-error-number+ 10)
 
@@ -54,5 +58,5 @@
   ;; First pass
   (let ((symbol-table (first-pass code)))
     ;; Second pass
-    (flexi-streams:with-output-to-sequence (output :element-type 'flexi-streams:octet)
+    (with-output-to-sequence (output :element-type 'octet)
       (second-pass code output symbol-table))))

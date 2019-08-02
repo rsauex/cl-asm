@@ -1,6 +1,8 @@
 (uiop:define-package #:cl-asm/src/avr
   (:use #:cl #:cl-asm/src/asm-base))
 
+(in-package #:cl-asm/src/avr)
+
 ;;; TODO:
 ;; - export
 
@@ -691,23 +693,78 @@
 
 ;;; Memory
 
-;; LAC   'Z'     r : R   1001 001r rrrr 0110   ;; - Load and clear
-;; LAS   'Z'     r : R   1001 001r rrrr 0101   ;; - Load and set
-;; LAT   'Z'     r : R   1001 001r rrrr 0111   ;; - Load and toggle
+(define-instruction lac
+  "Load and clear value at address Z"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  0 1 1 0))
 
-;; LD    d : R   'X'     1001 000d dddd 1100   ;; - Load indirect
-;; LD    d : R   'X+'    1001 000d dddd 1101   ;; - Load indirect
-;; LD    d : R   '-X'    1001 000d dddd 1110   ;; - Load indirect
+(define-instruction las
+  "Load and set value at address Z"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  0 1 0 1))
 
-;; LD    d : R   'Y'     1000 000d dddd 1000   ;; - Load indirect
-;; LD    d : R   'Y+'    1001 000d dddd 1001   ;; - Load indirect
-;; LD    d : R   '-Y'    1001 000d dddd 1010   ;; - Load indirect
-;; LDD   d : R   'Y+'q:I 10q0 qq0d dddd 1qqq   ;; - Load indirect
+(define-instruction lat
+  "Load and toogle value at address Z"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  0 1 1 1))
 
-;; LD    d : R   'Z'     1000 000d dddd 0000   ;; - Load indirect
-;; LD    d : R   'Z+'    1001 000d dddd 0001   ;; - Load indirect
-;; LD    d : R   '-Z'    1001 000d dddd 0010   ;; - Load indirect
-;; LDD   d : R   'Z+'q:I 10q0 qq0d dddd 0qqq   ;; - Load indirect
+
+(define-instruction ld-x
+  "Load from address X"
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  1 1 0 0))
+
+(define-instruction ld-x-inc
+  "Load from address X with post-increment"
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  1 1 0 1))
+
+(define-instruction ld-x-dec
+  "Load from address X with pre-decrement"
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  1 1 1 0))
+
+
+(define-instruction ld-y
+  "Load from address Y"
+  (((d register))
+   1 0 0 0  0 0 0 d  d d d d  1 0 0 0))
+
+(define-instruction ld-y-inc
+  "Load from address Y with post-increment"
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  1 0 0 1))
+
+(define-instruction ld-y-dec
+  "Load from address Y with pre-decrement"
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  1 0 1 0))
+
+(define-instruction ldd-y
+  "Load from address Y with displacement"
+  (((d register) (q immediate))
+   1 0 q 0  q q 0 d  d d d d  1 q q q))
+
+
+(define-instruction ld-z
+  "Load from address Z"
+  (((d register))
+   1 0 0 0  0 0 0 d  d d d d  0 0 0 0))
+
+(define-instruction ld-z-inc
+  "Load from address z with post-increment"
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  0 0 0 1))
+
+(define-instruction ld-z-dec
+  "Load from address Z with pre-decrement"
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  0 0 1 0))
+
+(define-instruction ldd-z
+  "Load from address Z with displacement"
+  (((d register) (q immediate))
+   1 0 q 0  q q 0 d  d d d d  0 q q q))
 
 
 (define-instruction ldi
@@ -725,19 +782,31 @@
   ;;  1 0 1 0  0 k k k  d d d d  k k k k)
   )
 
-(define-instruction lpm
+(define-instruction lpm-z
   "Load indirect from Program memory"
   (()
-   1 0 0 1  0 1 0 1  1 1 0 0  1 0 0 0))
-;; LPM   d : R   'Z'     1001 000d dddd 0100   ;; - Load indirect from Program memory
-;; LPM   d : R   'Z+'    1001 000d dddd 0101   ;; - Load indirect from Program memory
+   1 0 0 1  0 1 0 1  1 1 0 0  1 0 0 0)
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  0 1 0 0))
 
-(define-instruction elpm
+(define-instruction lpm-z-inc
+  "Load indirect from Program memory with post-increment"
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  0 1 0 1))
+
+
+(define-instruction elpm-z
   "Extended load program memory"
   (()
-   1 0 0 1  0 1 0 1  1 1 0 1  1 0 0 0))
-;; ELPM  d : R   'Z'     1001 000d dddd 0110   ;; - Extended load program memory
-;; ELPM  d : R   'Z+'    1001 000d dddd 0111   ;; - Extended load program memory
+   1 0 0 1  0 1 0 1  1 1 0 1  1 0 0 0)
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  0 1 1 0))
+
+(define-instruction elpm-z-inc
+  "Extended load program memory with post-increment"
+  (((d register))
+   1 0 0 1  0 0 0 d  d d d d  0 1 1 1))
+
 
 (define-instruction mov
   "Copy register"
@@ -761,23 +830,74 @@
    1 0 0 1  0 0 1 r  r r r r  1 1 1 1))
 
 
-(define-instruction spm
+(define-instruction spm-z
   "Store program memory"
   (()
    1 0 0 1  0 1 0 1  1 1 1 0  1 0 0 0))
-;; SPM   'Z+'            1001 0101 1111 1000   ;; - Store program memory
 
-;; ST    'X'     r : R   1001 001r rrrr 1100   ;; - Store indirect
-;; ST    'X+'    r : R   1001 001r rrrr 1101   ;; - Store indirect
-;; ST    '-X'    r : R   1001 001r rrrr 1110   ;; - Store indirect
-;; ST    'Y'     r : R   1000 001r rrrr 1000   ;; - Store indirect
-;; ST    'Y+'    r : R   1001 001r rrrr 1001   ;; - Store indirect
-;; ST    '-Y'    r : R   1001 001r rrrr 1010   ;; - Store indirect
-;; STD   'Y+'q:I r : R   10q0 qq1r rrrr 1qqq   ;; - Store indirect
-;; ST    'Z'     r : R   1000 001r rrrr 0000   ;; - Store indirect
-;; ST    'Z+'    r : R   1001 001r rrrr 0001   ;; - Store indirect
-;; ST    '-Z'    r : R   1001 001r rrrr 0010   ;; - Store indirect
-;; STD   'Z+'q:I r : R   10q0 qq1r rrrr 0qqq   ;; - Store indirect
+(define-instruction spm-z-inc
+  "Store program memory with post-increment"
+  (()
+   1 0 0 1  0 1 0 1  1 1 1 1  1 0 0 0))
+
+
+(define-instruction st-x
+  "Store at address X"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  1 1 0 0))
+
+(define-instruction st-x-inc
+  "Store at address X with post-increment"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  1 1 0 1))
+
+(define-instruction st-x-dec
+  "Store at address X with pre-decrement"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  1 1 1 0))
+
+
+(define-instruction st-y
+  "Store at address Y"
+  (((r register))
+   1 0 0 0  0 0 1 r  r r r r  1 0 0 0))
+
+(define-instruction st-y-inc
+  "Store at address Y with post-increment"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  1 0 0 1))
+
+(define-instruction st-y-dec
+  "Store at address Y with pre-decrement"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  1 0 1 0))
+
+(define-instruction std-y
+  "Store at address Y with displacement"
+  (((r register) (q immediate))
+   1 0 q 0  q q 1 r  r r r r  1 q q q))
+
+
+(define-instruction st-z
+  "Store at address Z"
+  (((r register))
+   1 0 0 0  0 0 1 r  r r r r  0 0 0 0))
+
+(define-instruction st-z-inc
+  "Store at address Z with post-increment"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  0 0 0 1))
+
+(define-instruction st-z-dec
+  "Store at address Z with pre-decrement"
+  (((r register))
+   1 0 0 1  0 0 1 r  r r r r  0 0 1 0))
+
+(define-instruction std-z
+  "Store at address Z with displacement"
+  (((r register) (q immediate))
+   1 0 q 0  q q 1 r  r r r r  0 q q q))
+
 
 (define-instruction sts
   "Store direct to Data space"
