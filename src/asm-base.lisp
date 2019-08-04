@@ -13,7 +13,7 @@
 (defconstant +max-error-number+ 10)
 
 (defgeneric instruction-size (instruction &rest arguments))
-(defgeneric instruction-encode (instruction output symbol-table &rest arguments))
+(defgeneric instruction-encode (instruction output symbol-table current-addr &rest arguments))
 
 (defun first-pass (code)
   "Traverse the code, collect labels, compute intructions offsets."
@@ -22,7 +22,7 @@
         (error-number 0))
     (block loop
       (dolist (entry code)
-        (handler-case
+        (progn;; handler-case
             (etypecase entry
               ;; label
               (symbol
@@ -30,11 +30,12 @@
               ;; instruction
               (list
                (incf offset (apply #'instruction-size entry))))
-          (error (e)
-            (format *error-output* "ERROR on ~A:~%~A~%" entry e)
-            (incf error-number)
-            (when (> error-number +max-error-number+)
-              (return-from loop))))))
+          ;; (error (e)
+          ;;   (format *error-output* "ERROR on ~A:~%~A~%" entry e)
+          ;;   (incf error-number)
+          ;;   (when (> error-number +max-error-number+)
+          ;;     (return-from loop)))
+            )))
     (if (zerop error-number)
         symbol-table
         (format *error-output* "~A error occured during 1st pass!~%" error-number))))
@@ -44,14 +45,16 @@
   (write-byte (ldb (byte 8 8) word) stream))
 
 (defun second-pass (code output symbol-table)
-  (dolist (entry code)
-    (etypecase entry
-      ;; label
-      (symbol
-       nil)
-      ;; instruction
-      (list
-       (apply #'instruction-encode (first entry) output symbol-table (rest entry))))))
+  (let ((current-addr 0))
+   (dolist (entry code)
+     (etypecase entry
+       ;; label
+       (symbol
+        nil)
+       ;; instruction
+       (list
+        (incf current-addr (apply #'instruction-size entry))
+        (apply #'instruction-encode (first entry) output symbol-table current-addr (rest entry)))))))
 
 (defun assemble (code)
   "This function generates machine instructions for assembler code."
